@@ -79,7 +79,7 @@ class MusicCog(commands.Cog):
         row = await cursor.fetchone()
         await cursor.close()
         if row and row[0] == 0:
-            await self._run_seed()
+            asyncio.create_task(self._run_seed())
 
     async def cog_unload(self) -> None:
         if self.db:
@@ -107,7 +107,7 @@ class MusicCog(commands.Cog):
                     return info["entries"][0]
                 return info
 
-        data = await asyncio.to_thread(_search)
+        data = await asyncio.wait_for(asyncio.to_thread(_search), timeout=20)
         return {
             "title": data.get("title", "Sem titulo"),
             "webpage_url": data.get("webpage_url", search_query),
@@ -116,22 +116,29 @@ class MusicCog(commands.Cog):
         }
 
     async def _run_seed(self) -> None:
-        if not self.db:
-            return
+        try:
+            if not self.db:
+                return
 
-        for track in SEED_TRACKS:
-            try:
-                data = await self._extract_track(f"ytsearch1:{track}")
-                await self.db.execute(
-                    """
-                    INSERT INTO playlist_comunidade (titulo, url, adicionado_por, data_adicao)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    """,
-                    (data["title"], data["webpage_url"], "Seed: Coffeehouse"),
-                )
-            except Exception:
-                continue
-        await self.db.commit()
+            for track in SEED_TRACKS:
+                try:
+                    data = await asyncio.wait_for(
+                        self._extract_track(f"ytsearch1:{track}"),
+                        timeout=20,
+                    )
+                    await self.db.execute(
+                        """
+                        INSERT INTO playlist_comunidade (titulo, url, adicionado_por, data_adicao)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (data["title"], data["webpage_url"], "Seed: Coffeehouse"),
+                    )
+                except Exception:
+                    continue
+
+            await self.db.commit()
+        except Exception as e:
+            print(f"Seed failed: {e}")
 
     async def _connect_voice(
         self, interaction: discord.Interaction
