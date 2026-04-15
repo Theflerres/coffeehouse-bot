@@ -1,0 +1,17 @@
+# Ambientes Virtuais
+venv/
+env/
+.venv/
+
+# Configurações e Tokens
+.env
+
+# Banco de Dados
+database/
+*.db
+*.sqlite3
+
+# Cache do Python e OS
+__pycache__/
+*.pyc
+.DS_Store
